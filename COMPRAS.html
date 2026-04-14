@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora Pro - Con Compartido Nativo</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .container { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); width: 100%; max-width: 1050px; margin-bottom: 20px; }
+        
+        .header-flex { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 15px; }
+        h2 { color: #1a73e8; margin: 0; }
+        
+        .tasa-box { background: #e8f0fe; padding: 10px 15px; border-radius: 10px; display: flex; align-items: center; gap: 10px; border: 1px solid #1a73e8; }
+        .tasa-box label { font-weight: bold; color: #1a73e8; font-size: 0.9rem; }
+        .tasa-box input { width: 90px; padding: 5px; border: 1px solid #1a73e8; border-radius: 5px; font-weight: bold; text-align: center; }
+        .btn-refresh { background: #1a73e8; color: white; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer; }
+
+        .input-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .field { display: flex; flex-direction: column; }
+        label { font-size: 0.75rem; font-weight: bold; margin-bottom: 5px; color: #555; text-transform: uppercase; }
+        input { padding: 10px; border: 1px solid #ddd; border-radius: 8px; outline: none; font-size: 0.9rem; }
+        
+        .input-usd { border-left: 4px solid #188038; }
+        .input-bs { border-left: 4px solid #d93025; }
+
+        .search-container { margin-bottom: 15px; background: #f8f9fa; padding: 10px; border-radius: 10px; border: 1px solid #e0e0e0; }
+        #buscador { width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; }
+
+        .td-input { width: 85px; padding: 6px; border: 1px solid #eee; border-radius: 5px; text-align: center; font-weight: bold; background: #fff; }
+        .td-input-bs { color: #d93025; font-size: 0.75rem; width: 100px; padding: 4px; border: 1px solid #f8d7da; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85rem; }
+        th { background-color: #f8f9fa; color: #333; padding: 12px; border-bottom: 2px solid #dee2e6; }
+        td { padding: 12px; border-bottom: 1px solid #eee; text-align: center; }
+        
+        .val-bs-label { color: #d93025; font-size: 0.75rem; font-weight: bold; }
+        .btn-delete { background-color: #ea4335; color: white; border: none; padding: 6px 10px; border-radius: 5px; cursor: pointer; }
+        
+        .actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+        button { border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; color: white; transition: transform 0.1s; }
+        button:active { transform: scale(0.95); }
+
+        .btn-add { background-color: #1a73e8; }
+        .btn-png { background-color: #34a853; }
+        .btn-share { background-color: #00acee; } /* Color estilo Twitter/Social */
+        .btn-save { background-color: #fbbc04; color: #333; }
+        .btn-load { background-color: #4285f4; }
+        .btn-clear { background-color: #5f6368; width: 100%; margin-top: 15px; }
+        
+        #area-exportar { background: white; padding: 15px; border-radius: 8px; }
+        #status-tasa { font-size: 0.65rem; color: #188038; margin-top: 2px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-flex">
+        <h2>Calculadora de Precios</h2>
+        <div class="tasa-box">
+            <div style="display:flex; flex-direction:column;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <label>TASA BCV:</label>
+                    <input type="number" id="tasa" step="0.01" oninput="manualTasa()">
+                    <button class="btn-refresh" onclick="obtenerTasaBCV()">🔄</button>
+                </div>
+                <span id="status-tasa">Actualizando...</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="input-grid">
+        <div class="field" style="grid-column: span 2;">
+            <label>Producto</label>
+            <input type="text" id="nombre" placeholder="Nombre del producto">
+        </div>
+        <div class="field">
+            <label>Caja ($)</label>
+            <input type="number" id="precioCajaUSD" class="input-usd" step="0.01" oninput="limpiarBs()">
+        </div>
+        <div class="field">
+            <label>Caja (Bs)</label>
+            <input type="number" id="precioCajaBs" class="input-bs" step="0.01" oninput="limpiarUSD()">
+        </div>
+        <div class="field">
+            <label>Uds.</label>
+            <input type="number" id="unidades" value="12">
+        </div>
+        <div class="field">
+            <label>% Margen</label>
+            <input type="number" id="margen" value="50">
+        </div>
+    </div>
+    
+    <div class="actions">
+        <button class="btn-add" onclick="agregarProducto()">Agregar</button>
+        <button class="btn-png" onclick="exportarPNG()">PNG</button>
+        <button class="btn-share" onclick="compartirAlma()">🚀 Compartir</button>
+        <button class="btn-save" onclick="guardarAlma()">Guardar .txt</button>
+        <button class="btn-load" onclick="document.getElementById('fileInput').click()">Cargar .txt</button>
+        <input type="file" id="fileInput" style="display:none;" accept=".txt" onchange="cargarAlma(event)">
+    </div>
+</div>
+
+<div class="container">
+    <div class="search-container no-export">
+        <label style="font-size: 0.7rem; font-weight: bold; color: #1a73e8;">🔍 BUSCAR PRODUCTO:</label>
+        <input type="text" id="buscador" placeholder="Escribe para filtrar..." oninput="renderizarTabla()">
+    </div>
+
+    <div id="area-exportar">
+        <h3 style="text-align: center; margin-bottom: 20px; color: #444;">Lista de Precios Detallada</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th style="text-align: left;">Producto</th>
+                    <th>Costo Caja ($)</th>
+                    <th>Uds.</th>
+                    <th>Unitario ($)</th>
+                    <th>% Ganancia</th>
+                    <th>Venta Sugerida ($ / Bs)</th>
+                    <th class="no-export">Acción</th>
+                </tr>
+            </thead>
+            <tbody id="listaProductos"></tbody>
+        </table>
+    </div>
+    <button class="btn-clear no-export" onclick="limpiarTodaLaLista()">Borrar toda la lista</button>
+</div>
+
+<script>
+    window.onload = function() {
+        obtenerTasaBCV();
+        renderizarTabla();
+    };
+
+    async function obtenerTasaBCV() {
+        const status = document.getElementById('status-tasa');
+        try {
+            const response = await fetch('https://ve.dolarapi.com/v1/dolares/oficial');
+            const data = await response.json();
+            document.getElementById('tasa').value = data.promedio;
+            localStorage.setItem('tasaBCV', data.promedio);
+            status.innerText = "Tasa oficial actualizada";
+            renderizarTabla();
+        } catch (e) {
+            status.innerText = "Error - Usando guardada";
+            const guardada = localStorage.getItem('tasaBCV');
+            if(guardada) document.getElementById('tasa').value = guardada;
+        }
+    }
+
+    function manualTasa() {
+        localStorage.setItem('tasaBCV', document.getElementById('tasa').value);
+        renderizarTabla();
+    }
+
+    function limpiarBs() { document.getElementById('precioCajaBs').value = ""; }
+    function limpiarUSD() { document.getElementById('precioCajaUSD').value = ""; }
+
+    function agregarProducto() {
+        const nombre = document.getElementById('nombre').value || "Producto";
+        const valUSD = parseFloat(document.getElementById('precioCajaUSD').value);
+        const valBs = parseFloat(document.getElementById('precioCajaBs').value);
+        const unidades = parseInt(document.getElementById('unidades').value) || 1;
+        const margen = parseFloat(document.getElementById('margen').value) || 0;
+        const tasa = parseFloat(document.getElementById('tasa').value) || 1;
+
+        let cajaUSD = 0;
+        if (!isNaN(valUSD)) cajaUSD = valUSD;
+        else if (!isNaN(valBs)) cajaUSD = valBs / tasa;
+        else return alert("Ingresa un precio");
+
+        const unitario = cajaUSD / unidades;
+        const venta = unitario * (1 + (margen / 100));
+
+        const nuevo = { id: Date.now(), nombre, cajaUSD, unidades, unitario, margen, venta };
+        let productos = JSON.parse(localStorage.getItem('misProductos')) || [];
+        productos.push(nuevo);
+        localStorage.setItem('misProductos', JSON.stringify(productos));
+
+        renderizarTabla();
+        document.getElementById('nombre').value = "";
+        document.getElementById('precioCajaUSD').value = "";
+        document.getElementById('precioCajaBs').value = "";
+        document.getElementById('nombre').focus();
+    }
+
+    function actualizarDato(id, campo, valor) {
+        let productos = JSON.parse(localStorage.getItem('misProductos')) || [];
+        const idx = productos.findIndex(p => p.id === id);
+        if (idx === -1) return;
+
+        let p = productos[idx];
+        const val = parseFloat(valor) || 0;
+        const tasa = parseFloat(document.getElementById('tasa').value) || 1;
+
+        if (campo === 'cajaUSD') {
+            p.cajaUSD = val;
+            p.unitario = p.cajaUSD / p.unidades;
+            p.venta = p.unitario * (1 + (p.margen / 100));
+        } 
+        else if (campo === 'margen') {
+            p.margen = val;
+            p.venta = p.unitario * (1 + (p.margen / 100));
+        }
+        else if (campo === 'venta') {
+            p.venta = val;
+            if (p.unitario > 0) p.margen = ((p.venta / p.unitario) - 1) * 100;
+        }
+        else if (campo === 'ventaBs') {
+            p.venta = val / tasa;
+            if (p.unitario > 0) p.margen = ((p.venta / p.unitario) - 1) * 100;
+        }
+
+        productos[idx] = p;
+        localStorage.setItem('misProductos', JSON.stringify(productos));
+        renderizarTabla();
+    }
+
+    function renderizarTabla() {
+        const lista = document.getElementById('listaProductos');
+        const searchTerms = document.getElementById('buscador').value.toLowerCase();
+        lista.innerHTML = "";
+        const productos = JSON.parse(localStorage.getItem('misProductos')) || [];
+        const tasa = parseFloat(document.getElementById('tasa').value) || 1;
+
+        const productosFiltrados = productos.filter(p => p.nombre.toLowerCase().includes(searchTerms));
+
+        productosFiltrados.forEach(p => {
+            const fila = lista.insertRow();
+            const formatBs = (val) => (val * tasa).toFixed(2);
+            fila.innerHTML = `
+                <td style="text-align: left; font-weight: 500;">${p.nombre}</td>
+                <td>
+                    <input type="number" class="td-input" value="${p.cajaUSD.toFixed(2)}" step="0.01" onchange="actualizarDato(${p.id}, 'cajaUSD', this.value)">
+                    <span class="val-bs-label" style="display:block; margin-top:4px;">Bs. ${(p.cajaUSD * tasa).toLocaleString('es-VE')}</span>
+                </td>
+                <td>${p.unidades}</td>
+                <td>
+                    <span style="font-weight:bold;">$${p.unitario.toFixed(2)}</span>
+                    <span class="val-bs-label" style="display:block; margin-top:2px;">Bs. ${(p.unitario * tasa).toLocaleString('es-VE')}</span>
+                </td>
+                <td>
+                    <input type="number" class="td-input" style="width:60px;" value="${Math.round(p.margen)}" onchange="actualizarDato(${p.id}, 'margen', this.value)">%
+                </td>
+                <td>
+                    <div style="display:flex; flex-direction:column; align-items:center; gap:5px;">
+                        <input type="number" class="td-input" style="color:#188038;" value="${p.venta.toFixed(2)}" step="0.01" onchange="actualizarDato(${p.id}, 'venta', this.value)">
+                        <div style="display:flex; align-items:center; gap:3px;">
+                            <span class="val-bs-label">Bs.</span>
+                            <input type="number" class="td-input td-input-bs" value="${formatBs(p.venta)}" step="0.01" onchange="actualizarDato(${p.id}, 'ventaBs', this.value)">
+                        </div>
+                    </div>
+                </td>
+                <td class="no-export"><button class="btn-delete" onclick="eliminarFila(${p.id})">Borrar</button></td>
+            `;
+        });
+    }
+
+    function eliminarFila(id) {
+        let productos = JSON.parse(localStorage.getItem('misProductos')) || [];
+        productos = productos.filter(p => p.id !== id);
+        localStorage.setItem('misProductos', JSON.stringify(productos));
+        renderizarTabla();
+    }
+
+    function limpiarTodaLaLista() {
+        if(confirm("¿Vaciar toda la lista?")) {
+            localStorage.removeItem('misProductos');
+            renderizarTabla();
+        }
+    }
+
+    // --- FUNCIÓN COMPARTIR NATIVA ---
+    async function compartirAlma() {
+        const alma = {
+            productos: JSON.parse(localStorage.getItem('misProductos')) || [],
+            tasa: localStorage.getItem('tasaBCV') || "0"
+        };
+        const contenido = JSON.stringify(alma, null, 2);
+        const fecha = new Date().toISOString().slice(0,10);
+        const fileName = `Respaldo_Precios_${fecha}.txt`;
+
+        if (navigator.canShare && navigator.share) {
+            try {
+                const file = new File([contenido], fileName, { type: 'text/plain' });
+                await navigator.share({
+                    files: [file],
+                    title: 'Respaldo Calculadora Precios',
+                    text: 'Te envío el respaldo (alma) de la lista de precios actual.'
+                });
+            } catch (err) {
+                console.log("Error al compartir: ", err);
+            }
+        } else {
+            alert("Tu navegador no soporta la función de compartir archivos. Usa el botón 'Guardar .txt' en su lugar.");
+        }
+    }
+
+    function guardarAlma() {
+        const alma = {
+            productos: JSON.parse(localStorage.getItem('misProductos')) || [],
+            tasa: localStorage.getItem('tasaBCV') || "0"
+        };
+        const blob = new Blob([JSON.stringify(alma, null, 2)], { type: 'text/plain' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `Respaldo_Precios_${new Date().toISOString().slice(0,10)}.txt`;
+        a.click();
+    }
+
+    function cargarAlma(event) {
+        const archivo = event.target.files[0];
+        if (!archivo) return;
+        const lector = new FileReader();
+        lector.onload = function(e) {
+            try {
+                const alma = JSON.parse(e.target.result);
+                if (alma.productos && alma.tasa) {
+                    localStorage.setItem('misProductos', JSON.stringify(alma.productos));
+                    localStorage.setItem('tasaBCV', alma.tasa);
+                    document.getElementById('tasa').value = alma.tasa;
+                    renderizarTabla();
+                    alert("¡Alma cargada!");
+                }
+            } catch (err) { alert("Archivo inválido."); }
+        };
+        lector.readAsText(archivo);
+    }
+
+    function exportarPNG() {
+        const area = document.getElementById('area-exportar');
+        const noExport = document.querySelectorAll('.no-export');
+        noExport.forEach(el => el.style.display = 'none');
+        html2canvas(area, { scale: 2 }).then(canvas => {
+            const link = document.createElement('a');
+            link.download = `Lista_Precios_BCV_${document.getElementById('tasa').value}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+            noExport.forEach(el => el.style.display = '');
+        });
+    }
+</script>
+
+</body>
+</html>
